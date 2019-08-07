@@ -4,7 +4,7 @@
 
 import numpy as np
 from . import md
-from .md.mdsample import MDSample
+from .md.mdsample import MDSample, freq_THz_to_red, freq_red_to_THz
 
 #import matplotlib.pyplot as plt
 from thermocepstrum.utils.loadAfterPlt import plt
@@ -15,10 +15,6 @@ try:
     plt
 except:
     log.write_log('Warning: plt undefined')
-
-
-def freq_THz_to_red(f, DT_FS):
-    return f / 1000. * DT_FS
 
 
 class HeatCurrent(MDSample):

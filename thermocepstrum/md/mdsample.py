@@ -4,8 +4,22 @@ import numpy as np
 from thermocepstrum.utils.loadAfterPlt import plt
 
 from .tools import integrate_acf, runavefilter
-from scipy.signal import periodogram
-from .acf import acovf
+
+
+def freq_THz_to_red(f_THz, DT_FS):
+    """
+    Converts THz to reduced frequency units.
+       f[red] = f[THz] * dt[fs] / 1000
+    """
+    return f_THz / 1000. * DT_FS
+
+
+def freq_red_to_THz(f_red, DT_FS):
+    """
+    Converts reduced frequency units to THz.
+       f[THz] = f[red] * 1000 / dt[fs]
+    """
+    return f_red * 1000. / DT_FS
 
 
 class MDSample(object):
@@ -36,7 +50,7 @@ class MDSample(object):
                     in the interval [0, 1/(2N*DT)]
        - psd        the Power Spectral Density (periodogram), defined as
                               DT    N-1
-                     I(f) =  ---- * SUM | x[n] * exp(-2.0J*pi*f/N)
+                     I(f) =  ---- * SUM | x[n] * exp(-2.0J*pi*f/N) |^2
                                N    n=0
                     with f = [0, 1/(2N*DT)]
        - N          size of traj
@@ -80,11 +94,14 @@ class MDSample(object):
               '  spectr: {}  frequencies\n'.format(self.Nfreqs)
         if self.psd is not None:
             msg = msg + '  psd:    {}  frequencies\n'.format(self.psd.size) + \
-                        '    DF =   {}  [omega*DT/2/pi]\n'.format(self.DF)
+                    '      DF =   {}  [omega*DT/(2*pi)]\n'.format(self.DF) + \
+                    '             {}  [THz]\n'.format(self.DF_THz) + \
+                    '  NyquistF = {}  [THz]'.format(self.Nyquist_f_THz)
         if self.fpsd is not None:
             msg = msg + '  fpsd:   {}  frequencies\n'.format(self.fpsd.size) +\
-                  '    FILTER_WINDOW_WIDTH = {} [omega*DT/2/pi]\n'.format(self.FILTER_WINDOW_WIDTH) +\
-                  '    FILTER_WF           = {} frequencies\n'.format(self.FILTER_WF)
+                    '      FILTER_WINDOW_WIDTH = {} [omega*DT/(2*pi)]\n'.format(self.FILTER_WINDOW_WIDTH) +\
+                    '                          = {} [THz]\n'.format(freq_red_to_THz(self.FILTER_WINDOW_WIDTH, self.DT_FS)) +\
+                    '      FILTER_WF           = {} frequencies\n'.format(self.FILTER_WF)
         if self.acf is not None:
             msg = msg + '  acf:    {}  lags\n'.format(self.NLAGS)
         return msg
@@ -165,7 +182,7 @@ class MDSample(object):
                     array = psd
             else:
                 raise ValueError('arguments not valid')
-        else:   #ignore freq)psd variable
+        else:   #ignore freq_psd variable
             frequencies = freqs
             array = psd
 
@@ -190,10 +207,10 @@ class MDSample(object):
         # freqs conversions to THz
         if DT_FS is not None:
             self.DT_FS = DT_FS
-        self.freqs_THz = self.freqs / self.DT_FS * 1000.
+        self.freqs_THz = freq_red_to_THz(self.freqs, self.DT_FS)
         self.Nyquist_f_THz = self.freqs_THz[-1]
         self.DF = 0.5 / (self.Nfreqs - 1)
-        self.DF_THz = self.DF / self.DT_FS * 1000.
+        self.DF_THz = freq_red_to_THz(self.DF)
         return
 
     #############################################
@@ -203,10 +220,11 @@ class MDSample(object):
     #############################################
 
     def timeseries(self):
+        """Return a time series (fs units)."""
         return np.arange(self.N) * self.DT_FS
 
     def compute_trajectory(self):
-        """Computes trajectory from spectrum."""
+        """Compute trajectory from spectrum by IFFT."""
         if self.spectr is None:
             raise ValueError('Spectrum not defined.')
         full_spectr = np.append(self.spectr, self.spectr[-2:0:-1].conj())
@@ -215,7 +233,7 @@ class MDSample(object):
         return
 
     def compute_spectrum(self):
-        """Computes spectrum from trajectory."""
+        """Compute spectrum from trajectory by FFT."""
         if self.traj is None:
             raise ValueError('Trajectory not defined.')
         full_spectr = np.fft.fft(self.traj)
@@ -224,15 +242,15 @@ class MDSample(object):
         self.DF = 0.5 / (self.Nfreqs - 1)
         return
 
-    #overridden in HeatCurrent (will call, at the end, this method)
     def compute_psd(self, FILTER_WINDOW_WIDTH=None, method='trajectory', DT_FS=None, average_components=True,
                     normalize=False):   # yapf: disable
+        # overridden in HeatCurrent (will call, at the end, this method)
         """
         Compute the periodogram from the trajectory or the spectrum.
-        If a FILTER_WINDOW_WIDTH (reduced frequency units) is known or given, the psd is also filtered.
+        If a FILTER_WINDOW_WIDTH (expressed in freq_units) is known or given, the psd is also filtered.
         The PSD is multiplied by DT_FS at the end.
         """
-
+        from scipy.signal import periodogram
         if DT_FS is not None:
             self.DT_FS = DT_FS
         if (method == 'trajectory'):
@@ -251,10 +269,10 @@ class MDSample(object):
             if self.spectr is None:
                 raise ValueError('Spectrum not defined.')
             self.psd = self.DT_FS * np.abs(self.spectr)**2 / (2 * (self.Nfreqs - 1))
-            #self.psd[1:-1] = self.psd[1:-1] * 2.0   # factor 2 from one-sided psd
             self.freqs = np.linspace(0., 0.5, self.Nfreqs)
         else:
             raise KeyError('method not understood')
+
         self.freqs_THz = self.freqs / self.DT_FS * 1000.
         self.Nyquist_f_THz = self.freqs_THz[-1]
         if normalize:
@@ -296,6 +314,7 @@ class MDSample(object):
 
     def compute_acf(self, NLAGS=None):
         """Computes the autocovariance function of the trajectory."""
+        from .acf import acovf
         if NLAGS is not None:
             self.NLAGS = NLAGS
         else:

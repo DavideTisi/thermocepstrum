@@ -37,4 +37,4 @@ Here are a few guidelines to consider when contributing.
 - [ ] Cepstral class (subclass of CosFilter)
 - [ ] Plot class that takes care of the plots from a CepstralResults object or MDSample (to discuss)
 - [ ] thermocepstrum GUI
-- [ ] there should be one single `compute_periodogram` method (either for single and multi component)
+- [ ] there should be one single `compute_periodogram` method (either for single and multi component) -- Is it possible to always integrate the multi-component case into mdsample?

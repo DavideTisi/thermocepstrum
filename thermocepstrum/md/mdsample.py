@@ -65,7 +65,7 @@ class MDSample(object):
         self.acf                    autocorrelation function
         self.N_COMPONENTS           number of equivalent (cartesian) components (an average over them will be computed)
         self.MULTI_COMPONENT        True if N_COMPONENTS > 1
-        self.FILTER_WINDOW_WIDTH    width of the moving average filter (reduced frequency units)
+        self.PSD_FILTER_W           width of the moving average filter (reduced frequency units)
         self.FILTER_WF              width of the moving average filter (number of frequencies)
 
     """
@@ -84,7 +84,8 @@ class MDSample(object):
         self.fcospectrum = None
 
         # other variables...
-        self.FILTER_WINDOW_WIDTH = None
+        self.PSD_FILTER_W = None
+        self.PSD_FILTER_W_THz = None
         self.FILTER_WF = None
         return
 
@@ -93,15 +94,15 @@ class MDSample(object):
               '  traj:   {}  steps  *  {} components\n'.format(self.N, self.N_COMPONENTS) + \
               '  spectr: {}  frequencies\n'.format(self.Nfreqs)
         if self.psd is not None:
-            msg = msg + '  psd:    {}  frequencies\n'.format(self.psd.size) + \
-                    '      DF =   {}  [omega*DT/(2*pi)]\n'.format(self.DF) + \
-                    '             {}  [THz]\n'.format(self.DF_THz) + \
-                    '  NyquistF = {}  [THz]'.format(self.Nyquist_f_THz)
+            msg = msg + '  psd:      {}  frequencies\n'.format(self.psd.size) + \
+                    '      DF =      {}  [omega*DT/(2*pi)]\n'.format(self.DF) + \
+                    '                {}  [THz]\n'.format(self.DF_THz) + \
+                    '  NyquistFreq = {}  [THz]'.format(self.Nyquist_f_THz)
         if self.fpsd is not None:
             msg = msg + '  fpsd:   {}  frequencies\n'.format(self.fpsd.size) +\
-                    '      FILTER_WINDOW_WIDTH = {} [omega*DT/(2*pi)]\n'.format(self.FILTER_WINDOW_WIDTH) +\
-                    '                          = {} [THz]\n'.format(freq_red_to_THz(self.FILTER_WINDOW_WIDTH, self.DT_FS)) +\
-                    '      FILTER_WF           = {} frequencies\n'.format(self.FILTER_WF)
+                    '      PSD_FILTER_W  = {} [omega*DT/(2*pi)]\n'.format(self.PSD_FILTER_W) +\
+                    '                    = {} [THz]\n'.format(self.PSD_FILTER_W_THz) +\
+                    '      FILTER_WF     = {} frequencies\n'.format(self.FILTER_WF)
         if self.acf is not None:
             msg = msg + '  acf:    {}  lags\n'.format(self.NLAGS)
         return msg
@@ -242,12 +243,11 @@ class MDSample(object):
         self.DF = 0.5 / (self.Nfreqs - 1)
         return
 
-    def compute_psd(self, FILTER_WINDOW_WIDTH=None, method='trajectory', DT_FS=None, average_components=True,
-                    normalize=False):   # yapf: disable
+    def compute_psd(self, PSD_FILTER_W=None, freq_units='thz', method='trajectory', DT_FS=None, normalize=False):
         # overridden in HeatCurrent (will call, at the end, this method)
         """
         Compute the periodogram from the trajectory or the spectrum.
-        If a FILTER_WINDOW_WIDTH (expressed in freq_units) is known or given, the psd is also filtered.
+        If a PSD_FILTER_W (expressed in freq_units) is known or given, the psd is also filtered.
         The PSD is multiplied by DT_FS at the end.
         """
         from scipy.signal import periodogram
@@ -280,18 +280,30 @@ class MDSample(object):
         self.logpsd = np.log(self.psd)
         self.psd_min = np.min(self.psd)
         self.psd_power = np.trapz(self.psd)   # one-side PSD power
-        if (FILTER_WINDOW_WIDTH is not None) or (self.FILTER_WINDOW_WIDTH is not None):
-            self.filter_psd(FILTER_WINDOW_WIDTH)
+        if (PSD_FILTER_W is not None) or (self.PSD_FILTER_W is not None):
+            self.filter_psd(PSD_FILTER_W, freq_units)
         return
 
-    def filter_psd(self, FILTER_WINDOW_WIDTH=None, window_type='rectangular', logpsd_filter_type=1):
-        """Filters the periodogram with the given FILTER_WINDOW_WIDTH [freq units]."""
+    def filter_psd(self, PSD_FILTER_W=None, freq_units='red', window_type='rectangular', logpsd_filter_type=1):
+        """
+        Filter the periodogram with the given PSD_FILTER_W [freq_units].
+          - PSD_FILTER_W  PSD filter window [freq_units]
+          - freq_units    frequency units   ['THz', 'red' (default)]
+          - window_type   filtering window type ['rectangular']
+        """
         if self.psd is None:
             raise ValueError('Periodogram is not defined.')
-        if FILTER_WINDOW_WIDTH is not None:   # otherwise try to use the internal value
-            self.FILTER_WINDOW_WIDTH = FILTER_WINDOW_WIDTH
-        if self.FILTER_WINDOW_WIDTH is not None:
-            self.FILTER_WF = int(round(self.FILTER_WINDOW_WIDTH * self.Nfreqs * 2.))
+        if PSD_FILTER_W is not None:   # otherwise try to use the internal value
+            if (freq_units == 'thz') or (freq_units == 'THz'):
+                self.PSD_FILTER_W_THz = PSD_FILTER_W
+                self.PSD_FILTER_W = freq_THz_to_red(PSD_FILTER_W)
+            elif (freq_units == 'red'):
+                self.PSD_FILTER_W = PSD_FILTER_W
+                self.PSD_FILTER_W_THz = freq_red_to_THz(PSD_FILTER_W)
+            else:
+                raise ValueError('Freq units not valid.')
+        if self.PSD_FILTER_W is not None:
+            self.FILTER_WF = int(round(self.PSD_FILTER_W * self.Nfreqs * 2.))
         else:
             raise ValueError('Filter window width not defined.')
         if (window_type == 'rectangular'):
@@ -333,9 +345,9 @@ class MDSample(object):
         self.taum = np.mean(self.tau, axis=1)   # average tau
         return
 
-    # this is called by HeatCurrent.
-    def compute_kappa_multi(self, others, FILTER_WINDOW_WIDTH=None, method='trajectory', DT_FS=None,
-                            average_components=True, normalize=False, call_other=True):   # yapf: disable
+    def compute_kappa_multi(self, others, PSD_FILTER_W=None, freq_units='red', method='trajectory', DT_FS=None,
+                            normalize=False, call_other=True):   # yapf: disable
+        # called by HeatCurrent
         """
         For multi-component (many current) systems: compute the cospectrum matrix and the transport coefficient.
         The results have almost the same statistical properties. The chi-square distribution has ndf = n - l + 1,
@@ -345,12 +357,12 @@ class MDSample(object):
         In this routine the mean over the number of temporal series is already multiplied by the correct factor (the
         transport coefficient will be obtained by multiplying the result by 0.5, as in the one-component case).
         The output arrays are the same as in the one-component case.
-        If a FILTER_WINDOW_WIDTH is known or given, the psd is also filtered.
+        If a PSD_FILTER_W is known or given, the psd is also filtered.
         The elements of the matrix are multiplied by DT_FS at the end.
         others is a list of other currents, i.e. MDSample objects. For example, in the case of 4 currents, of which
         j is the energy current and j1, j2, j3 are mass currents (MDSample objects):
 
-           j.compute_kappa_multi(others=[j1,j2,j3], FILTER_WINDOW_WIDTH=FILTER_WINDOW_WIDTH)
+           j.compute_kappa_multi([j1,j2,j3], PSD_FILTER_W, freq_units)
         """
         # check if others is an array
         if not isinstance(others, (list, tuple, np.ndarray)):
@@ -374,8 +386,8 @@ class MDSample(object):
         # calculate the same thing on the other trajectory
         if (call_other):
             for other in others:   # call other.compute_kappa_multi (MDsample method)
-                MDSample.compute_kappa_multi(other, [self], FILTER_WINDOW_WIDTH, method, self.DT_FS, average_components,
-                                             normalize, False)
+                MDSample.compute_kappa_multi(other, [self], PSD_FILTER_W, freq_units, method, self.DT_FS, normalize,
+                                             False)
         else:
             return
 
@@ -410,8 +422,8 @@ class MDSample(object):
         self.logpsd = np.log(self.psd)
         self.psd_min = np.min(self.psd)
         self.psd_power = np.trapz(self.psd)   # one-side PSD power
-        if (FILTER_WINDOW_WIDTH is not None) or (self.FILTER_WINDOW_WIDTH is not None):
-            self.filter_psd(FILTER_WINDOW_WIDTH)
+        if (PSD_FILTER_W is not None) or (self.PSD_FILTER_W is not None):
+            self.filter_psd(PSD_FILTER_W, freq_units)
         return
 
     ###################################
@@ -419,13 +431,14 @@ class MDSample(object):
     ###################################
     # customized line properties can be passed through the param_dict dictionary
     # see kwargs at: http://matplotlib.org/api/pyplot_api.html#matplotlib.pyplot.plot
+    # TODO: move these plot functions into a separate class
 
     def plot_traj(self, param_dict={'label': 'traj'}):
         """Plot the time series."""
         if self.traj is None:
             raise ValueError('Trajectory not defined.')
         plt.plot(self.traj, **param_dict)
-        plt.xlabel('t')
+        plt.xlabel(r'$t$')
         plt.grid()
         plt.legend()
         return
@@ -435,7 +448,7 @@ class MDSample(object):
         if self.psd is None:
             raise ValueError('Peridogram not defined.')
         plt.plot(self.freqs, self.psd, **param_dict)
-        plt.xlabel('f [$\omega$*DT/2$\pi$]')
+        plt.xlabel(r'$f$ [$\omega$*DT/2$\pi$]')
         plt.xticks(np.linspace(0., 0.5, 11))
         plt.legend()
         return
@@ -445,37 +458,37 @@ class MDSample(object):
         if self.logpsd is None:
             raise ValueError('Log-Peridogram not defined.')
         plt.plot(self.freqs, self.logpsd, **param_dict)
-        plt.xlabel('f [$\omega$*DT/2$\pi$]')
+        plt.xlabel(r'$f$ [$\omega$*DT/2$\pi$]')
         plt.xticks(np.linspace(0., 0.5, 11))
         plt.legend()
         return
 
-    def plot_fpsd(self, FILTER_WINDOW_WIDTH=None, param_dict={'label': 'f-psd'}):
+    def plot_fpsd(self, PSD_FILTER_W=None, freq_units='red', param_dict={'label': 'f-psd'}):
         """Plot the filtered periodogram.
-        If FILTER_WINDOW_WIDTH is defined/passed a filtered psd is computed,
+        If PSD_FILTER_W is defined/passed a filtered psd is computed,
         otherwise the internal copy is used.
         """
-        if (FILTER_WINDOW_WIDTH is not None) or (self.FILTER_WINDOW_WIDTH is not None):
-            self.filter_psd(FILTER_WINDOW_WIDTH)
+        if (PSD_FILTER_W is not None) or (self.PSD_FILTER_W is not None):
+            self.filter_psd(PSD_FILTER_W, freq_units)
         if self.fpsd is None:
             raise ValueError('Filtered peridogram not defined.')
         plt.plot(self.freqs, self.fpsd, **param_dict)
-        plt.xlabel('f [$\omega$*DT/2$\pi$]')
+        plt.xlabel(r'$f$ [$\omega$*DT/2$\pi$]')
         plt.xticks(np.linspace(0., 0.5, 11))
         plt.legend()
         return
 
-    def plot_flogpsd(self, FILTER_WINDOW_WIDTH=None, param_dict={'label': 'f-log(psd)'}):
+    def plot_flogpsd(self, PSD_FILTER_W=None, freq_units='red', param_dict={'label': 'f-log(psd)'}):
         """Plot the filtered periodogram.
-        If FILTER_WINDOW_WIDTH is defined/passed a filtered psd is computed,
+        If PSD_FILTER_W is defined/passed a filtered psd is computed,
         otherwise the internal copy is used.
         """
-        if (FILTER_WINDOW_WIDTH is not None) or (self.FILTER_WINDOW_WIDTH is not None):
-            self.filter_psd(FILTER_WINDOW_WIDTH)
+        if (PSD_FILTER_W is not None) or (self.PSD_FILTER_W is not None):
+            self.filter_psd(PSD_FILTER_W, freq_units)
         if self.flogpsd is None:
             raise ValueError('Filtered log-peridogram not defined.')
         plt.plot(self.freqs, self.flogpsd, **param_dict)
-        plt.xlabel('f [$\omega$*DT/2$\pi$]')
+        plt.xlabel(r'$f$ [$\omega$*DT/2$\pi$]')
         plt.xticks(np.linspace(0., 0.5, 11))
         plt.legend()
         return

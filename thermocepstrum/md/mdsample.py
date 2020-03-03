@@ -438,9 +438,10 @@ class MDSample(object):
         dim[axis] = nfilt+2
         out = np.zeros(tuple(dim))
         
-        highfreq= highfreq or samplerate / 2
-        assert highfreq <= samplerate / 2, "highfreq is greater than samplerate/2"
-        
+        #highfreq= highfreq or samplerate / 2
+        #assert highfreq <= samplerate / 2, "highfreq = {} is greater than samplerate/2 = {}".format(highfreq, samplerate/2)
+        #samplerate = highfreq/2
+
         # compute points evenly spaced in mels
         lowmel = self.hz2mel_rec(lowfreq, nrec)
         highmel = self.hz2mel_rec(highfreq, nrec)
@@ -504,7 +505,9 @@ class MDSample(object):
         if self.mel_nfilt is None:
            self.mel_nfilt = self.Nfreqs//10
 
-        self.mel_filtered, self.mel_points ,self.mel_bins = self.mel_filter( nfilt=self.mel_nfilt, samplerate=int(1e15/self.DT_FS),
+        #samplerate = int(2*self.Nyquist_f_THz*1e12)
+        samplerate = 2*self.Nyquist_f_THz*1e12
+        self.mel_filtered, self.mel_points ,self.mel_bins = self.mel_filter( nfilt=self.mel_nfilt, samplerate=samplerate,
                                                        lowfreq=0, highfreq=self.Nyquist_f_THz*1e12, axis=0, nrec=self.mel_nrecursion, triang=triang)
 
         self.mel_filtered_freqs, self.mel_filtered_psd = self.mel_interpolate(self.mel_points, self.mel_filtered, self.Nfreqs, nrec=self.mel_nrecursion)
@@ -528,8 +531,10 @@ class MDSample(object):
 
         arr = self.logpsd
 
+        #samplerate = int(2*self.Nyquist_f_THz*1e12)
+        samplerate = 2*self.Nyquist_f_THz*1e12
         self.mel_filtered, self.mel_points, self.mel_bins = self.mel_filter(arr=arr, nfilt=self.mel_nfilt,
-                                                             samplerate=int(1e15 / self.DT_FS),
+                                                             samplerate=samplerate,
                                                              lowfreq=0, highfreq=self.Nyquist_f_THz * 1e12, axis=0,
                                                              nrec=self.mel_nrecursion, triang=triang)
 
@@ -539,8 +544,9 @@ class MDSample(object):
         #                                                                    self.Nfreqs, nrec=self.mel_nrecursion)
 
         self.mel_filtered_psd = np.copy(self.psd)
-        self.mel_filtered_freqs_THz = self.mel2hz_rec(self.mel_points,self.mel_nrecursion)*1e-12 #self.mel_filtered_freqs * 1e-12
+        self.mel_filtered_freqs_THz = self.mel2hz_rec(self.mel_points, self.mel_nrecursion)*1e-12 #self.mel_filtered_freqs * 1e-12
         self.mel_logpsd = self.mel_filtered
+        self.mel_filtered_psd = np.exp(self.mel_logpsd)
         self.mel_psd_min = np.min(self.mel_filtered_psd)
         self.mel_psd_power = np.trapz(self.mel_filtered_psd)  # one-side PSD power
         return

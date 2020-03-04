@@ -230,9 +230,10 @@ class HeatCurrent(MDSample):
              #self.mel_psd_std, self.covxi = self.mel_dct.mel_compute_variance(self.mel_var_list,debug)
         else:
             self.mel_psd_std = self.mel_dct.mel_compute_variance(self.mel_var_list,debug)
-        # self.mel_psd_std  is the error on the f=log(kappa), the error on kappa is
-        # sigma_kappa = d(exp(f(omega)))/d(omega) * self.mel_psd_std = exp(f(omega)) * self.mel_psd_std
-        # so basically self.mel_psd_std that exits from mel_compute_variance is the relative error on PSD
+
+        # NOTA: self.mel_psd_std  is the error on f=log(kappa); the error on kappa is
+        #       sigma_kappa = |d(exp(f(omega)))/d(omega)| * self.mel_psd_std = exp(f(omega)) * self.mel_psd_std
+        #       so basically self.mel_psd_std that exits from mel_compute_variance is the relative error on PSD
 
         self.mel_dct.logtau_std_Kmin = self.mel_psd_std[0]
         self.mel_dct.tau_std_Kmin = self.mel_dct.tau_Kmin * self.mel_psd_std[0]

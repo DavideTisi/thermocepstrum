@@ -313,21 +313,34 @@ class CosFilter(object):
         :param debug: debug flag if True the code return also covariance matrix
         :return: variance on the mel-filtered cepstrum, civariance matrix (only if debug=True)
         '''
+        # Roba vecchia probabilmente da cancellare
+        ##############(n1, n2) = cov.shape
+        ##############for j1 in range(n1):
+        ##############    for m in range(n2):
+        ##############        tmp[] = np.sum(cov * np.exp(2*np.pi*1j*m*np.arange(n2)/n2), axis = 1)
+        ##############    tmp[j1, :] = cov[:, ] * exp(2*pi*sqrt(-1)*j*np.arange(n)/n)).mean().
 
         cov = diags([mel_var_list[0], mel_var_list[1], mel_var_list[1]],[0,1,-1]).toarray() #cov= covariance Xi
         
-        #cov_cc = irfft(rfft(cov,axis=1),axis=0)  #/cov.shape[0]
+
+        #### credo che la cosa da fare sia, invece, la DCT (ma anche no)
+        ###cov_cc = dct(dct(cov, type=1, axis = 1), type=1, axis = 0)  #/cov.shape[0]
+
+        
+        ###cov_cc = ifft(fft(cov, axis = 1), axis = 0)  #/cov.shape[0]
+        ###cov_cc[self.aic_Kmin + 1:,:] = 0.
+        ###cov_cc[:,self.aic_Kmin + 1:] = 0.
+        ###tmp1 = ifft(fft(cov_cc, axis = 0), axis = 1).real #*cov.shape[0]
+        
+        # Per velocizzare i conti: calcolo solo l'errore in zero, ovvero quello che diventerà l'errore su \kappa
         cov_cc = ifft(fft(cov, axis = 1), axis = 0)  #/cov.shape[0]
-        #(n1, n2) = cov.shape
-        #for j1 in range(n1):
-        #    for m in range(n2):
-        #        tmp[] = np.sum(cov * np.exp(2*np.pi*1j*m*np.arange(n2)/n2), axis = 1)
-        #    tmp[j1, :] = cov[:, ] * exp(2*pi*sqrt(-1)*j*np.arange(n)/n)).mean().
         cov_cc[self.aic_Kmin + 1:,:] = 0.
         cov_cc[:,self.aic_Kmin + 1:] = 0.
-        ##tmp = irfft(rfft(cov_cc,axis=1),axis=0).real #*cov.shape[0]
-        ##tmp = ifft(fft(cov_cc, axis = 1), axis = 0).real #*cov.shape[0] !!!WRONG axis
-        tmp1 = ifft(fft(cov_cc, axis = 0), axis = 1).real #*cov.shape[0]
+        tmp1 = np.sum(cov_cc).real/cov.shape[0]*np.ones(cov.shape)
+        
+        ####### # credo che la cosa da fare sia, invece, la DCT (ma anche no)
+        ####### tmp1 = dct(dct(cov_cc, type=1, axis = 0), type=1, axis = 1).real / 4 / cov.shape[0]**2 #*cov.shape[0]
+
         if(debug):
               (n1, n2) = cov.shape
               r1 = np.arange(n1)

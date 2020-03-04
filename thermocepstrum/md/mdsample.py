@@ -438,9 +438,11 @@ class MDSample(object):
         dim[axis] = nfilt+2
         out = np.zeros(tuple(dim))
         
-        #highfreq= highfreq or samplerate / 2
-        #assert highfreq <= samplerate / 2, "highfreq = {} is greater than samplerate/2 = {}".format(highfreq, samplerate/2)
-        #samplerate = highfreq/2
+
+        highfreq= highfreq or samplerate / 2
+        #assert highfreq <= samplerate / 2, "highfreq = {} is greater than samplerate/2 = {}".format(highfreq,samplerate/2)
+        if (highfreq > samplerate / 2):
+            print('# WARNING highfreq = {} is greater than samplerate/2 = {}'.format(highfreq,samplerate/2))
 
         # compute points evenly spaced in mels
         lowmel = self.hz2mel_rec(lowfreq, nrec)

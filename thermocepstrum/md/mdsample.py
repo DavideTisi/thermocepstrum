@@ -437,21 +437,17 @@ class MDSample(object):
         #dim[axis] = nfilt
         dim[axis] = nfilt+2
         out = np.zeros(tuple(dim))
-        
-        #highfreq= highfreq or samplerate / 2
-        #assert highfreq <= samplerate / 2, "highfreq = {} is greater than samplerate/2 = {}".format(highfreq, samplerate/2)
-        #samplerate = highfreq/2
 
         # compute points evenly spaced in mels
         lowmel = self.hz2mel_rec(lowfreq, nrec)
         highmel = self.hz2mel_rec(highfreq, nrec)
-        melpoints = np.linspace(lowmel,highmel,nfilt+2)
+        melpoints = np.linspace(lowmel, highmel, nfilt+2, endpoint=True)
         
         nfft = arr.shape[axis]
         
-        bins = np.floor(2*nfft*self.mel2hz_rec(melpoints, nrec)/samplerate)
+        bins = np.floor(nfft/samplerate*self.mel2hz_rec(melpoints, nrec))
         # mel2hz overestimates numerically the correct value 
-        if bins[-1] >= nfft: bins[-1] = nfft-1
+        #if bins[-1] >= nfft: bins[-1] = nfft-1
         #print('bins={}'.format(bins))
         
         for j in range(0, nfilt):
@@ -464,12 +460,12 @@ class MDSample(object):
                     fb = (bins[j+2]-i) / (bins[j+2]-bins[j+1])
                     #out[j] += fb*arr[i]
                     out[j+1] += fb*arr[i]
-                out[j+1] *= 2./(bins[j+2]-bins[j])
+                out[j] *= 2./(bins[j+2]-bins[j])
             else:
-                out[j+1] = np.sum(arr[int(bins[j]):int(bins[j+2])], axis=axis)/(bins[j+2]-bins[j])
+                out[j] = np.sum(arr[int(bins[j]):int(bins[j+2])], axis=axis)/(bins[j+2]-bins[j])
         
-        out[0] = arr[0]
-        out[-1] = arr[int(bins[-1])]
+        #out[0] = arr[0]
+        #out[-1] = arr[int(bins[-1])]
         #print('out={}'.format(out) )
         #N_bins = bins - np.roll(bins[-1])
         return out, melpoints,bins

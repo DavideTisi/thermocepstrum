@@ -41,29 +41,30 @@ def mel_multicomp_cepstral_parameters( N_COMPONENTS,bins):
     """
     NF = bins.shape[0]
     N = 2 * (NF - 1)
-    Nbins = np.zeros(NF)
-    Nbins[0] = Nbins[-1] = 1
-    Nbins[1:-1] = bins[2:] - bins[:-2]
-    #T = np.zeros(NF)
-    #T[0] = T[-1] = 1
-    #for i in range(1,NF-1):
-    #    T[i]=1./(bins[i+1]-bins[i-1])
+    Nbins = np.zeros(NF-2)
+    #Nbins[0] = Nbins[-1] = 1
+    #Nbins[1:-1] = bins[2:] - bins[:-2]
+    Nbins = bins[2:] - bins[:-2] + 1
     T = 1/Nbins
     # variance of cepstral coefficients
     trigamma = polygamma(1, N_COMPONENTS)
     ck_THEORY_var = 1. / N * np.concatenate(([2 * trigamma], [trigamma] * (NF - 2), [2 * trigamma]))
 
-    #compute the covariance matrix for Xi_j Xi_i
-    var_diag = Nbins * T**2 * trigamma
-    var_sdiag = np.zeros(NF-1)
-    var_sdiag [1:-2]=(bins[3:-1] - bins[2:-2])*T[1:-3]*T[2:-2]*trigamma
+    ### compute the covariance matrix for Xi_j Xi_i
+    var_diag = T * trigamma
+    #var_sdiag = np.zeros(NF-1)
+    var_sdiag = np.zeros(NF-3)
+    #var_sdiag [1:-2]=(bins[3:-1] - bins[2:-2])*T[1:-3]*T[2:-2]*trigamma
+    var_sdiag = (bins[2:-1] - bins[1:-2] + 1) * T[:-1] * T[1:] * trigamma
+    
+    
     # bias of log(PSD)
     #psd_THEORY_mean = (polygamma(0, N_COMPONENTS) - np.log(N_COMPONENTS)) * np.ones(NF)
     #psd_THEORY_mean[0] = polygamma(0, 0.5 * N_COMPONENTS) - np.log(0.5 * N_COMPONENTS)
     #psd_THEORY_mean[-1] = psd_THEORY_mean[0]
     psd_THEORY_mean = (polygamma(0, N_COMPONENTS) - np.log(N_COMPONENTS)) * Nbins * T
 
-    return ck_THEORY_var, psd_THEORY_mean,[var_diag,var_sdiag]
+    return ck_THEORY_var, psd_THEORY_mean, [var_diag, var_sdiag]
 
 def dct_coefficients(y):
     """Compute the normalized Discrete Cosine Transform coefficients of y.
@@ -313,33 +314,16 @@ class CosFilter(object):
         :param debug: debug flag if True the code return also covariance matrix
         :return: variance on the mel-filtered cepstrum, civariance matrix (only if debug=True)
         '''
-        # Roba vecchia probabilmente da cancellare
-        ##############(n1, n2) = cov.shape
-        ##############for j1 in range(n1):
-        ##############    for m in range(n2):
-        ##############        tmp[] = np.sum(cov * np.exp(2*np.pi*1j*m*np.arange(n2)/n2), axis = 1)
-        ##############    tmp[j1, :] = cov[:, ] * exp(2*pi*sqrt(-1)*j*np.arange(n)/n)).mean().
-
         cov = diags([mel_var_list[0], mel_var_list[1], mel_var_list[1]],[0,1,-1]).toarray() #cov= covariance Xi
         
 
-        #### credo che la cosa da fare sia, invece, la DCT (ma anche no)
-        ###cov_cc = dct(dct(cov, type=1, axis = 1), type=1, axis = 0)  #/cov.shape[0]
-
         
+        ### Vecchia formula approssimata # Per velocizzare i conti: calcolo solo l'errore in zero, ovvero quello che diventerà l'errore su \kappa
         ###cov_cc = ifft(fft(cov, axis = 1), axis = 0)  #/cov.shape[0]
         ###cov_cc[self.aic_Kmin + 1:,:] = 0.
         ###cov_cc[:,self.aic_Kmin + 1:] = 0.
-        ###tmp1 = ifft(fft(cov_cc, axis = 0), axis = 1).real #*cov.shape[0]
+        ###tmp1 = np.sum(cov_cc).real/cov.shape[0]*np.ones(cov.shape)
         
-        # Per velocizzare i conti: calcolo solo l'errore in zero, ovvero quello che diventerà l'errore su \kappa
-        cov_cc = ifft(fft(cov, axis = 1), axis = 0)  #/cov.shape[0]
-        cov_cc[self.aic_Kmin + 1:,:] = 0.
-        cov_cc[:,self.aic_Kmin + 1:] = 0.
-        tmp1 = np.sum(cov_cc).real/cov.shape[0]*np.ones(cov.shape)
-        
-        ####### # credo che la cosa da fare sia, invece, la DCT (ma anche no)
-        ####### tmp1 = dct(dct(cov_cc, type=1, axis = 0), type=1, axis = 1).real / 4 / cov.shape[0]**2 #*cov.shape[0]
 
         if(debug):
               (n1, n2) = cov.shape
@@ -358,8 +342,38 @@ class CosFilter(object):
               ems[:,self.aic_Kmin + 1:] = 0.
               tmp = np.einsum('am,bn,jn,mi,ji->ab', eps, ems, ep, em, cov, optimize='greedy').real
 
-        if debug : return np.sqrt(np.diag(tmp1)), cov,np.sqrt(np.diag(tmp)/n1/n2)
-        return np.sqrt(np.diag(tmp1))
+        ### Correct formula (fft makes the calculation efficient; possible improvements in the calculation of s5)
+        nfilt = len(mel_var_list[0])
+        nj = mel_var_list[0]
+        alphaj = np.zeros(len(nj))
+        alphaj[:-1] = mel_var_list[1]
+        twopinf = 2*np.pi/nfilt
+
+        fftnj = fft(nj)
+        fftalpha = fft(alphaj)
+        range0 = range(1, pstar)
+        range2 = range(-(pstar-1), 0)
+        ###
+        s1 = np.sum(nj + 2*alphaj)
+        ###
+        tmp = fftnj.real + fftalpha.real
+        s2 = np.sum(tmp[1:pstar])
+        ###
+        tmp = fftnj.real
+        s3 = np.sum([tmp.take(n1, mode='wrap') for n in range2 for n1 in range(n+1, n+pstar)])
+        ###
+        s4 = np.sum([fftalpha[n]*np.exp(-1j*twopinf*n) for n in range0]).real
+        ###
+        pinf = np.pi/nfilt
+        s5 = np.sum([np.cos(pinf*(n+n1)) * np.real(np.exp(-1j*pinf*(n-n1)) * \
+                                                   fftalpha.take(n-n1, mode='wrap')) \
+                      for n in range0 \
+                    for n1 in range0]).real
+    
+        v =  s1 + 4*(s2 + s3 + s4) + 8*s5
+
+        if debug : return np.sqrt(v)/nfilt, cov,np.sqrt(np.diag(tmp)/n1/n2)
+        return np.sqrt(v)/nfilt
 
 #    def optimize_cos_filter(self, thr=0.05, K_LIST=None, logtauref=None):
 #        if K_LIST is not None:

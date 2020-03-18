@@ -221,7 +221,10 @@ class HeatCurrent(MDSample):
         Resulting conductivity:
             kappa_Kmin  +/-  kappa_Kmin_std   [W/(m*K)]
         """
-
+        #MEMENTO
+        print(self.mel_logpsd)
+        print(self.mel_logpsd.shape)
+        #ENDMEMENTO
         self.mel_dct = md.CosFilter(self.mel_logpsd, ck_theory_var=self.mel_ck_THEORY_var, \
             psd_theory_mean=self.mel_psd_THEORY_mean, aic_type=aic_type, Kmin_corrfactor=Kmin_corrfactor)
         self.mel_dct.scan_filter_tau(K_PSD=K_PSD)
@@ -235,15 +238,20 @@ class HeatCurrent(MDSample):
         #       sigma_kappa = |d(exp(f(omega)))/d(omega)| * self.mel_psd_std = exp(f(omega)) * self.mel_psd_std
         #       so basically self.mel_psd_std that exits from mel_compute_variance is the relative error on PSD
 
-        self.mel_dct.logtau_std_Kmin = self.mel_psd_std[0]
-        self.mel_dct.tau_std_Kmin = self.mel_dct.tau_Kmin * self.mel_psd_std[0]
+        #self.mel_dct.logtau_std_Kmin = self.mel_psd_std[0]
+        #self.mel_dct.tau_std_Kmin = self.mel_dct.tau_Kmin * self.mel_psd_std[0]
+        self.mel_dct.logtau_std_Kmin = self.mel_psd_std
+        self.mel_dct.tau_std_Kmin = self.mel_dct.tau_Kmin * self.mel_psd_std
 
         self.mel_kappa_Kmin = self.mel_dct.tau_Kmin * self.kappa_scale * 0.5
         #self.mel_kappa_Kmin_std = self.mel_psd_std[0] * self.kappa_scale * 0.5
-        self.mel_kappa_Kmin_std = self.mel_psd_std[0] * self.mel_kappa_Kmin
+        
+        #self.mel_kappa_Kmin_std = self.mel_psd_std[0] * self.mel_kappa_Kmin
+        self.mel_kappa_Kmin_std = self.mel_psd_std * self.mel_kappa_Kmin
 
         # Now let's make self.mel_psd_std the true error on self.mel_dct.psd (the cepstrum filtered PSD)
-        self.mel_psd_std *= self.mel_dct.psd
+        #self.mel_psd_std *= self.mel_dct.psd
+        self.mel_psd_std = self.mel_dct.psd*self.mel_psd_std
         #print('self.mel_dct.psd= ',self.mel_dct.psd)
 
 

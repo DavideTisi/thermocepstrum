@@ -62,7 +62,7 @@ def mel_multicomp_cepstral_parameters( N_COMPONENTS,bins):
     #psd_THEORY_mean = (polygamma(0, N_COMPONENTS) - np.log(N_COMPONENTS)) * np.ones(NF)
     #psd_THEORY_mean[0] = polygamma(0, 0.5 * N_COMPONENTS) - np.log(0.5 * N_COMPONENTS)
     #psd_THEORY_mean[-1] = psd_THEORY_mean[0]
-    psd_THEORY_mean = (polygamma(0, N_COMPONENTS) - np.log(N_COMPONENTS)) * Nbins * T
+    psd_THEORY_mean = (polygamma(0, N_COMPONENTS) - np.log(N_COMPONENTS)) * np.ones(NF-2)
 
     return ck_THEORY_var, psd_THEORY_mean, [var_diag, var_sdiag]
 
@@ -345,12 +345,13 @@ class CosFilter(object):
         ### Correct formula (fft makes the calculation efficient; possible improvements in the calculation of s5)
         nfilt = len(mel_var_list[0])
         nj = mel_var_list[0]
-        alphaj = np.zeros(len(nj))
+        alphaj = np.zeros(nfilt)
         alphaj[:-1] = mel_var_list[1]
         twopinf = 2*np.pi/nfilt
 
         fftnj = fft(nj)
         fftalpha = fft(alphaj)
+        pstar = self.aic_Kmin + 1
         range0 = range(1, pstar)
         range2 = range(-(pstar-1), 0)
         ###
@@ -372,7 +373,7 @@ class CosFilter(object):
     
         v =  s1 + 4*(s2 + s3 + s4) + 8*s5
 
-        if debug : return np.sqrt(v)/nfilt, cov,np.sqrt(np.diag(tmp)/n1/n2)
+        if debug : return np.sqrt(v)/nfilt, cov, np.sqrt(np.diag(tmp)/n1/n2)
         return np.sqrt(v)/nfilt
 
 #    def optimize_cos_filter(self, thr=0.05, K_LIST=None, logtauref=None):

@@ -434,8 +434,8 @@ class MDSample(object):
         if arr is None : arr = self.psd
         
         dim = list(arr.shape)
-        #dim[axis] = nfilt
-        dim[axis] = nfilt+2
+        dim[axis] = nfilt
+        #dim[axis] = nfilt+2
         out = np.zeros(tuple(dim))
 
         # compute points evenly spaced in mels
@@ -444,8 +444,13 @@ class MDSample(object):
         melpoints = np.linspace(lowmel, highmel, nfilt+2, endpoint=True)
         
         nfft = arr.shape[axis]
+
+        dt=self.DT_FS*1e-15
+        dw = self.hz2mel_rec(1/(2*nfft*dt), nrec)
+        print(1/(2*nfft*dt))
+        print('suggested nfilt = ', np.floor((highmel-lowmel-dw)/(dw-lowmel/2)))
         
-        bins = np.floor(nfft/samplerate*self.mel2hz_rec(melpoints, nrec))
+        bins = np.floor(2*nfft/samplerate*self.mel2hz_rec(melpoints, nrec))
         # mel2hz overestimates numerically the correct value 
         #if bins[-1] >= nfft: bins[-1] = nfft-1
         #print('bins={}'.format(bins))
@@ -468,7 +473,12 @@ class MDSample(object):
         #out[-1] = arr[int(bins[-1])]
         #print('out={}'.format(out) )
         #N_bins = bins - np.roll(bins[-1])
-        return out, melpoints,bins
+        #MEMENTO
+        print('out',out)
+        print('melpoints', melpoints)
+        print('bins', bins)
+        #ENDMEMENTO
+        return out, melpoints[1:-1], bins
 
     def mel_interpolate(self, melpoints, y, nfft, nrec=1):
         """Interpolate the Mel-filtered spectrum.

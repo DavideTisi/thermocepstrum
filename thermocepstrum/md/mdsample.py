@@ -416,7 +416,7 @@ class MDSample(object):
             x = a*(np.exp(np.log(2)*x/(a))-1)
         return x
 
-    def mel_filter(self, arr=None,nfilt=None, samplerate=16000, lowfreq=0, highfreq=None, axis=0, nrec=1, triang=False):
+    def mel_filter(self, arr=None, nfilt=None, samplerate=16000, lowfreq=0, highfreq=None, axis=0, nrec=1, triang=False):
         """Compute the filtered spectrum on a Mel-like logarithmic scale.
 
         :param arr: Array to filter. If None  arr=self.psd .
@@ -433,22 +433,28 @@ class MDSample(object):
         
         if arr is None : arr = self.psd
         
+        nfft = arr.shape[axis]
+        
+        lowmel = self.hz2mel_rec(lowfreq, nrec)
+        highmel = self.hz2mel_rec(highfreq, nrec)
+       
+        dt = self.DT_FS*1e-15 #timestep in seconds
+        dw = self.hz2mel_rec(1/(2*nfft*dt), nrec) # frequency resolution
+        nfilt_ = int(np.floor((highmel-lowmel-dw)/(dw-lowmel/2)))
+        if nfilt is None: 
+            nfilt = nfilt_
+            print('Using suggested nfilt = ', nfilt)
+        else:
+            print('Warning: as per user input, nfilt = {}, while the suggested number is nfilt = {}'.format(nfilt, nfilt_))
+
         dim = list(arr.shape)
         dim[axis] = nfilt
-        #dim[axis] = nfilt+2
         out = np.zeros(tuple(dim))
 
         # compute points evenly spaced in mels
-        lowmel = self.hz2mel_rec(lowfreq, nrec)
-        highmel = self.hz2mel_rec(highfreq, nrec)
         melpoints = np.linspace(lowmel, highmel, nfilt+2, endpoint=True)
         
-        nfft = arr.shape[axis]
 
-        dt=self.DT_FS*1e-15
-        dw = self.hz2mel_rec(1/(2*nfft*dt), nrec)
-        print(1/(2*nfft*dt))
-        print('suggested nfilt = ', np.floor((highmel-lowmel-dw)/(dw-lowmel/2)))
         
         bins = np.floor(2*nfft/samplerate*self.mel2hz_rec(melpoints, nrec))
         # mel2hz overestimates numerically the correct value 
@@ -473,12 +479,12 @@ class MDSample(object):
         #out[-1] = arr[int(bins[-1])]
         #print('out={}'.format(out) )
         #N_bins = bins - np.roll(bins[-1])
-        #MEMENTO
-        print('out',out)
-        print('melpoints', melpoints)
-        print('bins', bins)
-        #ENDMEMENTO
-        return out, melpoints[1:-1], bins
+        if nfilt >= 10:
+            print('bins: ', bins[:10])
+        else:
+            print('bins: ', bins)
+        #return out, melpoints[1:-1], bins
+        return out, melpoints[:-2], bins, nfilt
 
     def mel_interpolate(self, melpoints, y, nfft, nrec=1):
         """Interpolate the Mel-filtered spectrum.
@@ -513,7 +519,7 @@ class MDSample(object):
 
         #samplerate = int(2*self.Nyquist_f_THz*1e12)
         samplerate = 2*self.Nyquist_f_THz*1e12
-        self.mel_filtered, self.mel_points ,self.mel_bins = self.mel_filter( nfilt=self.mel_nfilt, samplerate=samplerate,
+        self.mel_filtered, self.mel_points, self.mel_bins, self.mel_nfilt = self.mel_filter( nfilt=self.mel_nfilt, samplerate=samplerate,
                                                        lowfreq=0, highfreq=self.Nyquist_f_THz*1e12, axis=0, nrec=self.mel_nrecursion, triang=triang)
 
         self.mel_filtered_freqs, self.mel_filtered_psd = self.mel_interpolate(self.mel_points, self.mel_filtered, self.Nfreqs, nrec=self.mel_nrecursion)
@@ -531,15 +537,14 @@ class MDSample(object):
 
         """
 
-        if self.mel_nfilt is None:
-            self.mel_nfilt = self.Nfreqs // 10
-
+        #if self.mel_nfilt is None:
+        #    self.mel_nfilt = self.Nfreqs // 10
 
         arr = self.logpsd
 
         #samplerate = int(2*self.Nyquist_f_THz*1e12)
         samplerate = 2*self.Nyquist_f_THz*1e12
-        self.mel_filtered, self.mel_points, self.mel_bins = self.mel_filter(arr=arr, nfilt=self.mel_nfilt,
+        self.mel_filtered, self.mel_points, self.mel_bins, self.mel_nfilt = self.mel_filter(arr=arr, nfilt=self.mel_nfilt,
                                                              samplerate=samplerate,
                                                              lowfreq=0, highfreq=self.Nyquist_f_THz * 1e12, axis=0,
                                                              nrec=self.mel_nrecursion, triang=triang)

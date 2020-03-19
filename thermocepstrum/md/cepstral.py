@@ -176,8 +176,10 @@ class CosFilter(object):
             # ck THEORY variances:
             #    (pi^2)/3/N   for k = {0, N/2}
             #    (pi^2)/6/N   otherwise
+            #self.logpsdK_THEORY_var = 1. / N * np.concatenate(
+            #    ([np.pi**2 / 3], [np.pi**2 / 6.] * (NF - 2), [np.pi**2 / 3]))
             self.logpsdK_THEORY_var = 1. / N * np.concatenate(
-                ([np.pi**2 / 3], [np.pi**2 / 6.] * (NF - 2), [np.pi**2 / 3]))
+                ([np.pi**2 / 3], [np.pi**2 / 6.] * (NF - 3), [np.pi**2 / 3]))
             self.logpsdK_THEORY_std = np.sqrt(self.logpsdK_THEORY_var)
             # logtau THEORY variances:  (we assume to be summing ck up to K, included)
             #    (pi^2)/3/N*(2*K+1)   for K = {0, N/2-1}
@@ -314,7 +316,7 @@ class CosFilter(object):
         :param debug: debug flag if True the code return also covariance matrix
         :return: variance on the mel-filtered cepstrum, civariance matrix (only if debug=True)
         '''
-        cov = diags([mel_var_list[0], mel_var_list[1], mel_var_list[1]],[0,1,-1]).toarray() #cov= covariance Xi
+        if debug: cov = diags([mel_var_list[0], mel_var_list[1], mel_var_list[1]],[0,1,-1]).toarray() #cov= covariance Xi
         
 
         

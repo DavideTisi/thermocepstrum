@@ -480,9 +480,9 @@ class MDSample(object):
         #print('out={}'.format(out) )
         #N_bins = bins - np.roll(bins[-1])
         if nfilt >= 10:
-            print('bins: ', bins[:10])
+            print('bins[:10] = ', bins[:10])
         else:
-            print('bins: ', bins)
+            print('bins = ', bins)
         #return out, melpoints[1:-1], bins
         return out, melpoints[:-2], bins, nfilt
 

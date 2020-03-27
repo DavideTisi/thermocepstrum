@@ -221,10 +221,6 @@ class HeatCurrent(MDSample):
         Resulting conductivity:
             kappa_Kmin  +/-  kappa_Kmin_std   [W/(m*K)]
         """
-        #MEMENTO
-        print(self.mel_logpsd)
-        print(self.mel_logpsd.shape)
-        #ENDMEMENTO
         self.mel_dct = md.CosFilter(self.mel_logpsd, ck_theory_var=self.mel_ck_THEORY_var, \
             psd_theory_mean=self.mel_psd_THEORY_mean, aic_type=aic_type, Kmin_corrfactor=Kmin_corrfactor)
         self.mel_dct.scan_filter_tau(K_PSD=K_PSD)

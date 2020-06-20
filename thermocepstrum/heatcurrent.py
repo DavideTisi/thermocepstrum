@@ -143,6 +143,8 @@ class HeatCurrent(MDSample):
             self.kappa_scale = md.units.scale_kappa_METAL_ELtoSI(TEMPERATURE, VOLUME, 1.0)
         elif (self.units == 'real_visc'):
             self.kappa_scale  = md.units.scale_kappa_viscosity_REALtoSI(TEMPERATURE,VOLUME,1.0)
+        elif (self.units == 'cp_visc'):
+            self.kappa_scale = md.units.scale_kappa_viscosity_CPtoSI(TEMPERATURE, VOLUME, 1.0)
         else:
             raise ValueError('Units not supported.')
         return

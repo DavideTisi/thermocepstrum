@@ -374,6 +374,7 @@ class MDSample(object):
 
         # compute the element 1/"(0,0) of the inverse" (aka the transport coefficient)
         # the diagonal elements of the inverse have very convenient statistical properties
+        #print('cospectrum= ', self.cospectrum.transpose((2, 0, 1)))
         multi_psd = (np.linalg.inv(self.cospectrum.transpose((2, 0, 1)))[:, 0, 0]**-1).real / ndf_chi
 
         if normalize:

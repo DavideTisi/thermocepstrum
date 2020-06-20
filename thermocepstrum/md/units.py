@@ -15,7 +15,7 @@ def scale_kappa_REALtoSI(temp, volume, timestep):
 
 def scale_kappa_viscosity_REALtoSI(temp, volume, timestep):
     """
-    Conversion factor for the thermal conductivity from REAL LAMMPS units to SI units.
+    Conversion factor for the thermal conductivity from REAL LAMMPS units to SI units (1 Poise=0.1 Pa*s).
     INPUT:
     temp      =  temperature [ K ]
     volume    =  cell volume [ A^3 ]
@@ -33,11 +33,11 @@ def scale_kappa_viscosity_REALtoSI(temp, volume, timestep):
    # print('kb= ',kB)
    # print('temp= ',temp)
    # print('timestep= ',timestep)
-    return volume * atmtoPa**2  / kB / temp  * timestep * 1.0e-12
+    return volume * atmtoPa**2  / kB / temp  * timestep * 1.0e-11
 
 def scale_kappa_viscosity_CPtoSI(temp, volume, timestep):
     """
-    Conversion factor for the thermal conductivity from REAL LAMMPS units to SI units.
+    Conversion factor for the thermal conductivity from REAL LAMMPS units to SI units (1 Poise=0.1 Pa*s).
     INPUT:
     temp      =  temperature [ K ]
     volume    =  cell volume [ a_bohr^3 ]

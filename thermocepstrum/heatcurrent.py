@@ -128,6 +128,7 @@ class HeatCurrent(MDSample):
         self.TEMPERATURE = TEMPERATURE
         self.VOLUME = VOLUME
         self.DT_FS = DT_FS
+        self.ustring = 'W/mK'
         # timestep is already included in the PSD definition, so it will be ignored here
         if (self.units == 'metal'):
             self.kappa_scale = md.units.scale_kappa_METALtoSI(TEMPERATURE, VOLUME, 1.0)
@@ -142,8 +143,10 @@ class HeatCurrent(MDSample):
         elif (self.units == 'metal_el'):
             self.kappa_scale = md.units.scale_kappa_METAL_ELtoSI(TEMPERATURE, VOLUME, 1.0)
         elif (self.units == 'real_visc'):
+            self.ustring = 'P'
             self.kappa_scale  = md.units.scale_kappa_viscosity_REALtoSI(TEMPERATURE,VOLUME,1.0)
         elif (self.units == 'cp_visc'):
+            self.ustring = 'P'
             self.kappa_scale = md.units.scale_kappa_viscosity_CPtoSI(TEMPERATURE, VOLUME, 1.0)
         else:
             raise ValueError('Units not supported.')
@@ -211,7 +214,7 @@ class HeatCurrent(MDSample):
               '  L_0*   = {:18f} +/- {:10f}\n'.format(self.dct.logtau_Kmin, self.dct.logtau_std_Kmin) +\
               '  S_0*   = {:18f} +/- {:10f}\n'.format(self.dct.tau_Kmin, self.dct.tau_std_Kmin) +\
               '-----------------------------------------------------\n' +\
-              '  kappa* = {:18f} +/- {:10f}  W/mK\n'.format(self.kappa_Kmin, self.kappa_Kmin_std) +\
+              '  kappa* = {:18f} +/- {:10f}  {}\n'.format(self.kappa_Kmin, self.kappa_Kmin_std,self.ustring) +\
               '-----------------------------------------------------\n'
         log.write_log(self.cepstral_log)
         return
@@ -264,7 +267,7 @@ class HeatCurrent(MDSample):
               '  L_0*   = {:18f} +/- {:10f}\n'.format(self.mel_dct.logtau_Kmin, self.mel_dct.logtau_std_Kmin) +\
               '  S_0*   = {:18f} +/- {:10f}\n'.format(self.mel_dct.tau_Kmin, self.mel_dct.tau_std_Kmin) +\
               '-----------------------------------------------------\n' +\
-              '  Mel kappa* = {:18f} +/- {:10f}  W/mK\n'.format(self.mel_kappa_Kmin, self.mel_kappa_Kmin_std) +\
+              '  Mel kappa* = {:18f} +/- {:10f}  {}\n'.format(self.mel_kappa_Kmin, self.mel_kappa_Kmin_std,self.ustring) +\
               '-----------------------------------------------------\n'
         log.write_log(self.mel_cepstral_log)
         return
